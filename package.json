@@ -1,0 +1,198 @@
+{
+  "name": "trae-task-folder-manager",
+  "displayName": "SOLO Task Folders",
+  "description": "Organize TraeCode SOLO tasks into workspace and global folders.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "trae",
+    "solo",
+    "task",
+    "folder"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "traeTaskFolders",
+          "title": "SOLO 任务文件夹",
+          "icon": "media/folder-tree.svg"
+        }
+      ]
+    },
+    "views": {
+      "traeTaskFolders": [
+        {
+          "id": "traeTaskFolders.tasks",
+          "name": "任务文件夹",
+          "contextualTitle": "SOLO 任务文件夹"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "traeTaskFolders.createFolder",
+        "title": "SOLO 任务文件夹: 新建文件夹",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "traeTaskFolders.renameFolder",
+        "title": "SOLO 任务文件夹: 重命名文件夹",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "traeTaskFolders.deleteFolder",
+        "title": "SOLO 任务文件夹: 删除文件夹",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "traeTaskFolders.createTask",
+        "title": "SOLO 任务文件夹: 在文件夹中新建任务",
+        "icon": "$(add)"
+      },
+      {
+        "command": "traeTaskFolders.addCurrentTask",
+        "title": "SOLO 任务文件夹: 将当前任务加入文件夹",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "traeTaskFolders.renameTask",
+        "title": "SOLO 任务文件夹: 重命名任务",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "traeTaskFolders.moveTask",
+        "title": "SOLO 任务文件夹: 移动任务",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "traeTaskFolders.removeTask",
+        "title": "SOLO 任务文件夹: 移除任务引用",
+        "icon": "$(close)"
+      },
+      {
+        "command": "traeTaskFolders.moveFolder",
+        "title": "SOLO 任务文件夹: 移动文件夹",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "traeTaskFolders.openTask",
+        "title": "SOLO 任务文件夹: 打开任务"
+      },
+      {
+        "command": "traeTaskFolders.searchTasks",
+        "title": "SOLO 任务文件夹: 搜索任务",
+        "icon": "$(search)"
+      },
+      {
+        "command": "traeTaskFolders.refresh",
+        "title": "SOLO 任务文件夹: 刷新",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "traeTaskFolders.diagnostics",
+        "title": "SOLO 任务文件夹: 检查 TRAE 兼容性",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "traeTaskFolders.focus",
+        "title": "SOLO 任务文件夹: 打开任务文件夹"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "traeTaskFolders.createFolder",
+          "when": "view == traeTaskFolders.tasks",
+          "group": "navigation@1"
+        },
+        {
+          "command": "traeTaskFolders.addCurrentTask",
+          "when": "view == traeTaskFolders.tasks",
+          "group": "navigation@2"
+        },
+        {
+          "command": "traeTaskFolders.searchTasks",
+          "when": "view == traeTaskFolders.tasks",
+          "group": "navigation@3"
+        },
+        {
+          "command": "traeTaskFolders.refresh",
+          "when": "view == traeTaskFolders.tasks",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "traeTaskFolders.createFolder",
+          "when": "view == traeTaskFolders.tasks && (viewItem == scopeRoot || viewItem == folder)",
+          "group": "inline@1"
+        },
+        {
+          "command": "traeTaskFolders.createTask",
+          "when": "view == traeTaskFolders.tasks && viewItem == folder",
+          "group": "inline@2"
+        },
+        {
+          "command": "traeTaskFolders.addCurrentTask",
+          "when": "view == traeTaskFolders.tasks && viewItem == folder",
+          "group": "navigation@1"
+        },
+        {
+          "command": "traeTaskFolders.renameFolder",
+          "when": "view == traeTaskFolders.tasks && viewItem == folder",
+          "group": "navigation@2"
+        },
+        {
+          "command": "traeTaskFolders.moveFolder",
+          "when": "view == traeTaskFolders.tasks && viewItem == folder",
+          "group": "navigation@3"
+        },
+        {
+          "command": "traeTaskFolders.deleteFolder",
+          "when": "view == traeTaskFolders.tasks && viewItem == folder",
+          "group": "navigation@4"
+        },
+        {
+          "command": "traeTaskFolders.renameTask",
+          "when": "view == traeTaskFolders.tasks && viewItem == task",
+          "group": "navigation@1"
+        },
+        {
+          "command": "traeTaskFolders.moveTask",
+          "when": "view == traeTaskFolders.tasks && viewItem == task",
+          "group": "navigation@2"
+        },
+        {
+          "command": "traeTaskFolders.removeTask",
+          "when": "view == traeTaskFolders.tasks && viewItem == task",
+          "group": "navigation@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "test": "tsx --test test/**/*.test.ts",
+    "package": "npm run check && npm test && node esbuild.mjs --production",
+    "vsix": "npm run package && vsce package --allow-missing-repository --out dist/trae-task-folder-manager.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "1.107.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
