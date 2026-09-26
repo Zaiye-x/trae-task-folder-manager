@@ -2,6 +2,7 @@ export const TRAE_COMMANDS = {
   createTask: "workbench.action.icube.aiChatSidebar.createNewSession",
   currentSessionId: "icube.chat.getCurrentSessionId",
   openSession: "workbench.action.chat.openSessionInSidebar",
+  globalSearch: "workbench.action.icube.aiChatSidebar.globalSearch",
   showHistory: "workbench.action.icube.aiChatSidebar.showHistory"
 } as const;
 
@@ -18,10 +19,11 @@ export interface TraeCapabilities {
   createTask: boolean;
   currentSessionId: boolean;
   openSession: boolean;
+  globalSearch: boolean;
   showHistory: boolean;
 }
 
-export type OpenTaskResult = "opened" | "history-fallback";
+export type OpenTaskResult = "opened" | "search-fallback";
 
 export class TraeCompatibilityError extends Error {
   constructor(
@@ -39,7 +41,8 @@ export class TraeAdapter {
     private readonly createSessionResource: (sessionId: string) => unknown,
     private readonly delay: (milliseconds: number) => Promise<void> = (
       milliseconds
-    ) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+    ) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+    private readonly openVerificationAttempts = 8
   ) {}
 
   async getCapabilities(): Promise<TraeCapabilities> {
@@ -48,6 +51,7 @@ export class TraeAdapter {
       createTask: commands.has(TRAE_COMMANDS.createTask),
       currentSessionId: commands.has(TRAE_COMMANDS.currentSessionId),
       openSession: commands.has(TRAE_COMMANDS.openSession),
+      globalSearch: commands.has(TRAE_COMMANDS.globalSearch),
       showHistory: commands.has(TRAE_COMMANDS.showHistory)
     };
   }
@@ -103,25 +107,53 @@ export class TraeAdapter {
     );
   }
 
-  async openTask(sessionId: string): Promise<OpenTaskResult> {
+  async openTask(
+    sessionId: string,
+    taskTitle: string
+  ): Promise<OpenTaskResult> {
+    if ((await this.tryGetCurrentSessionId()) === sessionId) {
+      return "opened";
+    }
+
     const resource = this.createSessionResource(sessionId);
     try {
       await this.host.executeCommand<void>(TRAE_COMMANDS.openSession, {
         session: { resource }
       });
-      return "opened";
+      if (await this.waitForSession(sessionId)) {
+        return "opened";
+      }
     } catch {
-      await this.host.writeClipboard(sessionId);
+      // Continue to the verified native-search fallback.
+    }
+
+    const searchText = taskTitle.trim() || sessionId;
+    await this.host.writeClipboard(searchText);
+    try {
+      await this.host.executeCommand<void>(TRAE_COMMANDS.globalSearch, {
+        entryType: "plugin"
+      });
+    } catch {
       try {
         await this.host.executeCommand<void>(TRAE_COMMANDS.showHistory);
       } catch {
-        // The copied Session ID still gives the user a recovery path.
+        // The copied title still gives the user a recovery path.
       }
-      await this.host.showWarning(
-        "当前 TraeCode 版本不支持直接打开该任务。Session ID 已复制，请在历史任务中定位。"
-      );
-      return "history-fallback";
     }
+    await this.host.showWarning(
+      `TraeCode 未开放按 Session ID 直接切换的接口。已打开任务搜索并复制“${searchText}”，请粘贴后选择对应任务。`
+    );
+    return "search-fallback";
+  }
+
+  private async waitForSession(sessionId: string): Promise<boolean> {
+    for (let attempt = 0; attempt < this.openVerificationAttempts; attempt++) {
+      if ((await this.tryGetCurrentSessionId()) === sessionId) {
+        return true;
+      }
+      await this.delay(120);
+    }
+    return false;
   }
 
   private async tryGetCurrentSessionId(): Promise<string | undefined> {

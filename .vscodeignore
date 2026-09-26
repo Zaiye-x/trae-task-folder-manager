@@ -3,6 +3,7 @@
 .github/**
 .vscode/**
 docs/**
+draft_*/**
 src/**
 test/**
 node_modules/**

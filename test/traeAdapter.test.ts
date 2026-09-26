@@ -64,9 +64,15 @@ describe("TraeAdapter", () => {
 
   it("opens a task using a local chat-session resource", async () => {
     const host = new FakeHost();
-    const adapter = new TraeAdapter(host, createLocalChatSessionUri);
+    host.currentSessionIds.push("current-session", "session-123");
+    const adapter = new TraeAdapter(
+      host,
+      createLocalChatSessionUri,
+      async () => undefined,
+      1
+    );
 
-    const result = await adapter.openTask("session-123");
+    const result = await adapter.openTask("session-123", "目标任务");
 
     assert.equal(result, "opened");
     const openCall = host.calls.find(
@@ -81,17 +87,22 @@ describe("TraeAdapter", () => {
     ]);
   });
 
-  it("falls back to history and clipboard when direct opening fails", async () => {
+  it("falls back when the open command reports success without switching", async () => {
     const host = new FakeHost();
-    host.failOpen = true;
-    const adapter = new TraeAdapter(host, createLocalChatSessionUri);
+    host.currentSessionIds.push("current-session", "current-session");
+    const adapter = new TraeAdapter(
+      host,
+      createLocalChatSessionUri,
+      async () => undefined,
+      1
+    );
 
-    const result = await adapter.openTask("session-123");
+    const result = await adapter.openTask("session-123", "目标任务");
 
-    assert.equal(result, "history-fallback");
-    assert.deepEqual(host.clipboard, ["session-123"]);
+    assert.equal(result, "search-fallback");
+    assert.deepEqual(host.clipboard, ["目标任务"]);
     assert.equal(
-      host.calls.some((call) => call.command === TRAE_COMMANDS.showHistory),
+      host.calls.some((call) => call.command === TRAE_COMMANDS.globalSearch),
       true
     );
     assert.equal(host.warnings.length, 1);
@@ -101,7 +112,7 @@ describe("TraeAdapter", () => {
     const host = new FakeHost();
     host.commands = [
       TRAE_COMMANDS.currentSessionId,
-      TRAE_COMMANDS.showHistory
+      TRAE_COMMANDS.globalSearch
     ];
     const adapter = new TraeAdapter(host, createLocalChatSessionUri);
 
@@ -109,7 +120,8 @@ describe("TraeAdapter", () => {
       createTask: false,
       currentSessionId: true,
       openSession: false,
-      showHistory: true
+      globalSearch: true,
+      showHistory: false
     });
   });
 });

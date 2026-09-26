@@ -224,9 +224,15 @@ export class CommandController {
 
     const sessionId = await this.trae.getCurrentSessionId();
     const existing = this.findTaskBySessionId(sessionId);
+    const existingTitle =
+      existing && !isGeneratedTaskTitle(existing.task.title)
+        ? existing.task.title
+        : "";
     const title = await vscode.window.showInputBox({
       title: existing ? "更新任务名称" : "登记当前 SOLO 任务",
-      value: existing?.task.title ?? `SOLO 任务 ${sessionId.slice(0, 8)}`,
+      prompt: "请输入与 TRAE 左侧任务列表一致、便于搜索的任务名称",
+      placeHolder: "例如：华南区客户画像分析",
+      value: existingTitle,
       validateInput: validateDisplayName
     });
     if (!title) {
@@ -314,7 +320,10 @@ export class CommandController {
     if (!scopedTask) {
       return;
     }
-    await this.trae.openTask(scopedTask.task.sessionId);
+    await this.trae.openTask(
+      scopedTask.task.sessionId,
+      scopedTask.task.title
+    );
   }
 
   private async searchTasks(): Promise<void> {
@@ -349,7 +358,10 @@ export class CommandController {
       placeHolder: "输入任务名称、文件夹或 Session ID"
     });
     if (selected) {
-      await this.trae.openTask(selected.scopedTask.task.sessionId);
+      await this.trae.openTask(
+        selected.scopedTask.task.sessionId,
+        selected.scopedTask.task.title
+      );
     }
   }
 
@@ -475,6 +487,10 @@ function validateDisplayName(value: string): string | undefined {
     return "名称不能超过 100 个字符。";
   }
   return undefined;
+}
+
+function isGeneratedTaskTitle(title: string): boolean {
+  return /^SOLO 任务 [0-9a-f]{8}$/i.test(title.trim());
 }
 
 function collectDescendants(

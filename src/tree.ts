@@ -285,7 +285,6 @@ export class TaskTreeProvider
     item.id = `task:${node.scope}:${node.task.id}`;
     item.contextValue = "task";
     item.iconPath = new vscode.ThemeIcon("comment-discussion");
-    item.description = node.task.sessionId.slice(0, 8);
     item.tooltip = new vscode.MarkdownString(
       [
         `**${escapeMarkdown(node.task.title)}**`,
