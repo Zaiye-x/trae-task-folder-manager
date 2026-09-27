@@ -119,4 +119,4 @@ docs/     设计文档与截图
 
 [MIT](LICENSE)
 
-活动栏图标基于 Lucide `folder-tree` 图标，按 ISC License 使用。
+活动栏图标基于 Lucide `folder-trae` 图标，按 ISC License 使用。
