@@ -13,6 +13,7 @@ import {
   TaskTreeProvider
 } from "./tree";
 import { TraeAdapter, TRAE_COMMANDS } from "./traeAdapter";
+import type { TaskTitleResolver } from "./traeTaskMetadata";
 
 interface FolderDestination extends vscode.QuickPickItem {
   scope: StorageScope;
@@ -24,7 +25,8 @@ export class CommandController {
     private readonly context: vscode.ExtensionContext,
     private readonly service: TaskService,
     private readonly tree: TaskTreeProvider,
-    private readonly trae: TraeAdapter
+    private readonly trae: TraeAdapter,
+    private readonly taskTitles: TaskTitleResolver
   ) {}
 
   register(): void {
@@ -227,17 +229,12 @@ export class CommandController {
     const existingTitle =
       existing && !isGeneratedTaskTitle(existing.task.title)
         ? existing.task.title
-        : "";
-    const title = await vscode.window.showInputBox({
-      title: existing ? "更新任务名称" : "登记当前 SOLO 任务",
-      prompt: "请输入与 TRAE 左侧任务列表一致、便于搜索的任务名称",
-      placeHolder: "例如：华南区客户画像分析",
-      value: existingTitle,
-      validateInput: validateDisplayName
-    });
-    if (!title) {
-      return;
-    }
+        : undefined;
+    const resolvedTitle = await this.taskTitles.resolveTitle(sessionId);
+    const title =
+      existingTitle ??
+      resolvedTitle ??
+      `未命名任务 ${sessionId.slice(0, 8)}`;
 
     if (existing) {
       await this.service.renameTask(existing, title);
@@ -255,6 +252,9 @@ export class CommandController {
       });
     }
     this.tree.refresh();
+    await vscode.window.showInformationMessage(
+      `已将“${title}”加入任务文件夹。`
+    );
   }
 
   private async renameTask(node?: TaskTreeNode): Promise<void> {
@@ -490,7 +490,7 @@ function validateDisplayName(value: string): string | undefined {
 }
 
 function isGeneratedTaskTitle(title: string): boolean {
-  return /^SOLO 任务 [0-9a-f]{8}$/i.test(title.trim());
+  return /^(?:SOLO 任务|未命名任务) [0-9a-f]{8}$/i.test(title.trim());
 }
 
 function collectDescendants(

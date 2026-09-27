@@ -1,6 +1,10 @@
 dist/
 node_modules/
 draft_*/
+.dbg/
+.vscode/
+coverage/
 *.vsix
 *.log
+debug-*.md
 .DS_Store

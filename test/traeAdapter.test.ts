@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { NativeTaskSearchSelection } from "../src/macOsTaskSearchNavigator";
 import { createLocalChatSessionUri } from "../src/sessionResource";
 import {
   TraeAdapter,
@@ -11,10 +12,12 @@ import {
 class FakeHost implements TraeHost {
   readonly calls: Array<{ command: string; args: unknown[] }> = [];
   readonly clipboard: string[] = [];
+  readonly searchSelections: string[] = [];
   readonly warnings: string[] = [];
   commands = Object.values(TRAE_COMMANDS);
   currentSessionIds: Array<string | undefined> = [];
   failOpen = false;
+  searchSelection: NativeTaskSearchSelection = "unsupported";
 
   async executeCommand<T>(
     command: string,
@@ -38,6 +41,13 @@ class FakeHost implements TraeHost {
     this.clipboard.push(value);
   }
 
+  async selectTaskInNativeSearch(
+    taskTitle: string
+  ): Promise<NativeTaskSearchSelection> {
+    this.searchSelections.push(taskTitle);
+    return this.searchSelection;
+  }
+
   async showWarning(message: string): Promise<void> {
     this.warnings.push(message);
   }
@@ -59,6 +69,34 @@ describe("TraeAdapter", () => {
     assert.equal(
       host.calls.some((call) => call.command === TRAE_COMMANDS.createTask),
       true
+    );
+  });
+
+  it("opens and focuses the native SOLO view when the target is already current", async () => {
+    const host = new FakeHost();
+    host.currentSessionIds.push("session-123");
+    const adapter = new TraeAdapter(host, createLocalChatSessionUri);
+
+    const result = await adapter.openTask("session-123", "目标任务");
+
+    assert.equal(result, "opened");
+    assert.equal(
+      host.calls.some(
+        (call) =>
+          call.command === TRAE_COMMANDS.openChatView &&
+          JSON.stringify(call.args) === JSON.stringify([{ keepOpen: true }])
+      ),
+      true
+    );
+    assert.equal(
+      host.calls.some(
+        (call) => call.command === TRAE_COMMANDS.focusChatView
+      ),
+      true
+    );
+    assert.equal(
+      host.calls.some((call) => call.command === TRAE_COMMANDS.openSession),
+      false
     );
   });
 
@@ -105,7 +143,45 @@ describe("TraeAdapter", () => {
       host.calls.some((call) => call.command === TRAE_COMMANDS.globalSearch),
       true
     );
+    const globalSearchIndex = host.calls.findIndex(
+      (call) => call.command === TRAE_COMMANDS.globalSearch
+    );
+    const selectAllIndex = host.calls.findIndex(
+      (call) => call.command === TRAE_COMMANDS.selectAll
+    );
+    const pasteIndex = host.calls.findIndex(
+      (call) => call.command === TRAE_COMMANDS.paste
+    );
+    assert.ok(globalSearchIndex >= 0);
+    assert.ok(selectAllIndex > globalSearchIndex);
+    assert.ok(pasteIndex > selectAllIndex);
     assert.equal(host.warnings.length, 1);
+    assert.match(
+      host.warnings[0] ?? "",
+      /已将“目标任务”填入任务搜索框/
+    );
+  });
+
+  it("verifies a Session switch after accessibility selects the search result", async () => {
+    const host = new FakeHost();
+    host.searchSelection = "selected";
+    host.currentSessionIds.push(
+      "current-session",
+      "current-session",
+      "session-123"
+    );
+    const adapter = new TraeAdapter(
+      host,
+      createLocalChatSessionUri,
+      async () => undefined,
+      1
+    );
+
+    const result = await adapter.openTask("session-123", "目标任务");
+
+    assert.equal(result, "opened");
+    assert.deepEqual(host.searchSelections, ["目标任务"]);
+    assert.equal(host.warnings.length, 0);
   });
 
   it("reports the currently available TraeCode commands", async () => {
@@ -121,7 +197,11 @@ describe("TraeAdapter", () => {
       currentSessionId: true,
       openSession: false,
       globalSearch: true,
-      showHistory: false
+      showHistory: false,
+      openChatView: false,
+      focusChatView: false,
+      selectAll: false,
+      paste: false
     });
   });
 });

@@ -2,9 +2,17 @@
   "name": "trae-task-folder-manager",
   "displayName": "SOLO Task Folders",
   "description": "Organize TraeCode SOLO tasks into workspace and global folders.",
-  "version": "0.1.1",
+  "version": "0.1.6",
   "publisher": "local",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zaiye-x/trae-task-folder-manager.git"
+  },
+  "homepage": "https://github.com/Zaiye-x/trae-task-folder-manager#readme",
+  "bugs": {
+    "url": "https://github.com/Zaiye-x/trae-task-folder-manager/issues"
+  },
   "engines": {
     "vscode": "^1.107.0"
   },

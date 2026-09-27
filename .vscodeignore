@@ -2,6 +2,8 @@
 .gitignore
 .github/**
 .vscode/**
+.dbg/**
+debug-*.md
 docs/**
 draft_*/**
 src/**

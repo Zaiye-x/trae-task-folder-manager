@@ -1,9 +1,15 @@
+import type { NativeTaskSearchSelection } from "./macOsTaskSearchNavigator";
+
 export const TRAE_COMMANDS = {
   createTask: "workbench.action.icube.aiChatSidebar.createNewSession",
   currentSessionId: "icube.chat.getCurrentSessionId",
   openSession: "workbench.action.chat.openSessionInSidebar",
   globalSearch: "workbench.action.icube.aiChatSidebar.globalSearch",
-  showHistory: "workbench.action.icube.aiChatSidebar.showHistory"
+  showHistory: "workbench.action.icube.aiChatSidebar.showHistory",
+  openChatView: "workbench.action.chat.icube.open",
+  focusChatView: "workbench.panel.chat.view.ai-chat.focus",
+  selectAll: "editor.action.selectAll",
+  paste: "editor.action.clipboardPasteAction"
 } as const;
 
 export type TraeCommandName = keyof typeof TRAE_COMMANDS;
@@ -12,6 +18,9 @@ export interface TraeHost {
   executeCommand<T>(command: string, ...args: unknown[]): Promise<T>;
   getCommands(): Promise<string[]>;
   writeClipboard(value: string): Promise<void>;
+  selectTaskInNativeSearch(
+    taskTitle: string
+  ): Promise<NativeTaskSearchSelection>;
   showWarning(message: string): Promise<void>;
 }
 
@@ -21,6 +30,10 @@ export interface TraeCapabilities {
   openSession: boolean;
   globalSearch: boolean;
   showHistory: boolean;
+  openChatView: boolean;
+  focusChatView: boolean;
+  selectAll: boolean;
+  paste: boolean;
 }
 
 export type OpenTaskResult = "opened" | "search-fallback";
@@ -52,7 +65,11 @@ export class TraeAdapter {
       currentSessionId: commands.has(TRAE_COMMANDS.currentSessionId),
       openSession: commands.has(TRAE_COMMANDS.openSession),
       globalSearch: commands.has(TRAE_COMMANDS.globalSearch),
-      showHistory: commands.has(TRAE_COMMANDS.showHistory)
+      showHistory: commands.has(TRAE_COMMANDS.showHistory),
+      openChatView: commands.has(TRAE_COMMANDS.openChatView),
+      focusChatView: commands.has(TRAE_COMMANDS.focusChatView),
+      selectAll: commands.has(TRAE_COMMANDS.selectAll),
+      paste: commands.has(TRAE_COMMANDS.paste)
     };
   }
 
@@ -111,7 +128,9 @@ export class TraeAdapter {
     sessionId: string,
     taskTitle: string
   ): Promise<OpenTaskResult> {
-    if ((await this.tryGetCurrentSessionId()) === sessionId) {
+    const currentSessionId = await this.tryGetCurrentSessionId();
+    await this.tryFocusChatView();
+    if (currentSessionId === sessionId) {
       return "opened";
     }
 
@@ -129,10 +148,12 @@ export class TraeAdapter {
 
     const searchText = taskTitle.trim() || sessionId;
     await this.host.writeClipboard(searchText);
+    let searchOpened = false;
     try {
       await this.host.executeCommand<void>(TRAE_COMMANDS.globalSearch, {
         entryType: "plugin"
       });
+      searchOpened = true;
     } catch {
       try {
         await this.host.executeCommand<void>(TRAE_COMMANDS.showHistory);
@@ -140,8 +161,24 @@ export class TraeAdapter {
         // The copied title still gives the user a recovery path.
       }
     }
+    const searchPopulated =
+      searchOpened && (await this.tryPopulateNativeSearch());
+    const accessibilitySelection =
+      await this.host.selectTaskInNativeSearch(searchText);
+    const switchedAfterAccessibility =
+      accessibilitySelection === "selected" &&
+      (await this.waitForSession(sessionId));
+    if (switchedAfterAccessibility) {
+      return "opened";
+    }
     await this.host.showWarning(
-      `TraeCode 未开放按 Session ID 直接切换的接口。已打开任务搜索并复制“${searchText}”，请粘贴后选择对应任务。`
+      accessibilitySelection === "permission-denied"
+        ? searchPopulated
+          ? `已将“${searchText}”填入任务搜索框。macOS 尚未允许自动确认，请按回车打开任务。`
+          : "macOS 尚未允许自动控制 TRAE。请在“系统设置 > 隐私与安全性 > 辅助功能”中授权 Trae CN 后重试；当前任务名称已复制。"
+        : searchPopulated || accessibilitySelection === "filled"
+          ? `已将“${searchText}”填入任务搜索框，但未能确认目标 Session，请按回车或选择匹配任务。`
+          : `已打开任务搜索并复制“${searchText}”，请粘贴后选择对应任务。`
     );
     return "search-fallback";
   }
@@ -154,6 +191,39 @@ export class TraeAdapter {
       await this.delay(120);
     }
     return false;
+  }
+
+  private async tryFocusChatView(): Promise<boolean> {
+    let opened = false;
+    try {
+      await this.host.executeCommand<void>(TRAE_COMMANDS.openChatView, {
+        keepOpen: true
+      });
+      opened = true;
+    } catch {
+      // The generated view focus command remains a compatibility fallback.
+    }
+    try {
+      await this.host.executeCommand<void>(TRAE_COMMANDS.focusChatView);
+      return true;
+    } catch {
+      return opened;
+    }
+  }
+
+  private async tryPopulateNativeSearch(): Promise<boolean> {
+    await this.delay(180);
+    try {
+      await this.host.executeCommand<void>(TRAE_COMMANDS.selectAll);
+    } catch {
+      // The search input is normally empty, so paste can still succeed.
+    }
+    try {
+      await this.host.executeCommand<void>(TRAE_COMMANDS.paste);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async tryGetCurrentSessionId(): Promise<string | undefined> {

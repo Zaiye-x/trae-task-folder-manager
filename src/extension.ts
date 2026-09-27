@@ -1,11 +1,13 @@
 import * as vscode from "vscode";
 
 import { CommandController } from "./commands";
+import { MacOsTaskSearchNavigator } from "./macOsTaskSearchNavigator";
 import { TaskRepository } from "./repository";
 import { createLocalChatSessionUri } from "./sessionResource";
 import { TaskService } from "./taskService";
 import { TaskTreeProvider } from "./tree";
 import { TraeAdapter, type TraeHost } from "./traeAdapter";
+import { TraeTaskMetadataResolver } from "./traeTaskMetadata";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("SOLO Task Folders");
@@ -51,12 +53,15 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
+  const taskSearchNavigator = new MacOsTaskSearchNavigator();
   const traeHost: TraeHost = {
     executeCommand: <T>(command: string, ...args: unknown[]) =>
       Promise.resolve(vscode.commands.executeCommand<T>(command, ...args)),
     getCommands: () => Promise.resolve(vscode.commands.getCommands(true)),
     writeClipboard: (value: string) =>
       Promise.resolve(vscode.env.clipboard.writeText(value)),
+    selectTaskInNativeSearch: (taskTitle: string) =>
+      taskSearchNavigator.selectTask(taskTitle),
     showWarning: async (message: string) => {
       await vscode.window.showWarningMessage(message);
     }
@@ -64,8 +69,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const trae = new TraeAdapter(traeHost, (sessionId) =>
     vscode.Uri.from(createLocalChatSessionUri(sessionId))
   );
+  const taskTitles = new TraeTaskMetadataResolver();
 
-  new CommandController(context, service, tree, trae).register();
+  new CommandController(context, service, tree, trae, taskTitles).register();
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(() => tree.refresh())
   );
